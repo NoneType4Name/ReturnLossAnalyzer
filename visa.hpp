@@ -1,9 +1,7 @@
 #pragma once
 #include <visa.h>
 #include <string>
-#include <vector>
 #include <stdexcept>
-#include <sstream>
 #include <chrono>
 #include <thread>
 
@@ -43,24 +41,11 @@ struct ScpiError
 class VisaInstrument
 {
   public:
-    explicit VisaInstrument( const std::string &addr,
-                             unsigned timeout_ms    = 5000,
+    explicit VisaInstrument( ViSession inst,
+                             uint32_t timeout_ms    = 1000,
                              bool check_after_write = true ) :
-        addr_( addr ), check_after_write_( check_after_write )
+        instr_( inst ), check_after_write_( check_after_write )
     {
-        ViStatus st = viOpenDefaultRM( &rm_ );
-        if ( st < VI_SUCCESS )
-            throw VisaError( st, "viOpenDefaultRM", "Cannot open VISA RM" );
-
-        st = viOpen( rm_, const_cast<char *>( addr.c_str() ),
-                     VI_NULL, VI_NULL, &instr_ );
-        if ( st < VI_SUCCESS )
-        {
-            viClose( rm_ );
-            rm_ = 0;
-            throw VisaError( st, "viOpen(" + addr + ")", "Cannot open instrument" );
-        }
-
         viSetAttribute( instr_, VI_ATTR_TMO_VALUE, timeout_ms );
 
         viSetAttribute( instr_, VI_ATTR_TERMCHAR, '\n' );
@@ -80,20 +65,19 @@ class VisaInstrument
 
     VisaInstrument( VisaInstrument &&o ) noexcept
         :
-        rm_( o.rm_ ), instr_( o.instr_ ), addr_( std::move( o.addr_ ) ), check_after_write_( o.check_after_write_ )
+        instr_( o.instr_ ), addr_( std::move( o.addr_ ) ), check_after_write_( o.check_after_write_ )
     {
-        o.rm_ = o.instr_ = 0;
+        o.instr_ = 0;
     }
     VisaInstrument &operator=( VisaInstrument &&o ) noexcept
     {
         if ( this != &o )
         {
             close();
-            rm_                = o.rm_;
             instr_             = o.instr_;
             addr_              = std::move( o.addr_ );
             check_after_write_ = o.check_after_write_;
-            o.rm_ = o.instr_ = 0;
+            o.instr_           = 0;
         }
         return *this;
     }
@@ -258,14 +242,8 @@ class VisaInstrument
             viClose( instr_ );
             instr_ = 0;
         }
-        if ( rm_ )
-        {
-            viClose( rm_ );
-            rm_ = 0;
-        }
     }
 
-    ViSession rm_    = 0;
     ViSession instr_ = 0;
     std::string addr_;
     bool check_after_write_ = true;
