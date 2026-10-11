@@ -4,7 +4,6 @@
 #include "Visa.hpp"
 #include <QMainWindow>
 #include <QFutureWatcher>
-#include <memory>
 
 QT_BEGIN_NAMESPACE
 namespace Ui
@@ -25,7 +24,7 @@ class MainWindow : public QMainWindow
     void on_connectButton_clicked();
 
     void on_reloadPushButton_clicked();
-    void on_reloadPushButton_finished();
+    void onReloadPushButtonFinished();
 
     void on_testButton_clicked();
 

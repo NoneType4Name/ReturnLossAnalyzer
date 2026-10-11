@@ -10,7 +10,7 @@ MainWindow::MainWindow( QWidget *parent ) :
     QMainWindow( parent ), ui( new Ui::MainWindow )
 {
     ui->setupUi( this );
-    connect( &reloadWatcher, &QFutureWatcher<QVector<QString>>::finished, this, &MainWindow::on_reloadPushButton_finished );
+    connect( &reloadWatcher, &QFutureWatcher<QVector<QString>>::finished, this, &MainWindow::onReloadPushButtonFinished );
 }
 
 MainWindow::~MainWindow()
@@ -50,7 +50,7 @@ void MainWindow::on_reloadPushButton_clicked()
     reloadWatcher.setFuture( future );
 }
 
-void MainWindow::on_reloadPushButton_finished()
+void MainWindow::onReloadPushButtonFinished()
 {
     auto selected { ui->comPortsComboBox->currentText() };
     ui->comPortsComboBox->clear();

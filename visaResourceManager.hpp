@@ -17,10 +17,8 @@ class VisaResourceManager
 
     ViSession openSession( const QString &resource, int timeoutMs );
 
-    // Закрытие конкретной сессии
     void closeSession( ViSession &session );
 
-    // Проверка "жив ли" RM
     bool isValid() const noexcept
     {
         return m_rm != VI_NULL;
