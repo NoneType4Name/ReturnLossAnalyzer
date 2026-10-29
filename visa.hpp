@@ -47,14 +47,8 @@ class VisaInstrument
         instr_( inst ), check_after_write_( check_after_write )
     {
         viSetAttribute( instr_, VI_ATTR_TMO_VALUE, timeout_ms );
-
         viSetAttribute( instr_, VI_ATTR_TERMCHAR, '\n' );
         viSetAttribute( instr_, VI_ATTR_TERMCHAR_EN, VI_TRUE );
-        viSetAttribute( instr_, VI_ATTR_ASRL_BAUD, 115200 );
-        viSetAttribute( instr_, VI_ATTR_ASRL_DATA_BITS, 8 );
-        viSetAttribute( instr_, VI_ATTR_ASRL_PARITY, VI_ASRL_PAR_NONE );
-        viSetAttribute( instr_, VI_ATTR_ASRL_STOP_BITS, VI_ASRL_STOP_ONE );
-        viSetAttribute( instr_, VI_ATTR_ASRL_FLOW_CNTRL, VI_ASRL_FLOW_NONE );
 
         viClear( instr_ );
         viFlush( instr_, VI_WRITE_BUF | VI_READ_BUF );
@@ -147,12 +141,10 @@ class VisaInstrument
                                   &got );
             if ( got > 0 ) out.append( buf, got );
 
-            if ( st == VI_ERROR_TMO && !out.empty() ) break;
-            throw VisaError( st, "viRead", "Read failed on " + addr_ );
+            if ( st == VI_SUCCESS_TERM_CHAR ) break;
+            else if ( st < 0 )
+                throw VisaError( st, "viRead", "Read failed on " + addr_ );
         }
-
-        while ( !out.empty() && ( out.back() == '\n' || out.back() == '\r' ) )
-            out.pop_back();
         return out;
     }
 

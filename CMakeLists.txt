@@ -9,8 +9,8 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets Concurrent)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Concurrent)
+find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets Concurrent PrintSupport)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Concurrent PrintSupport)
 find_package(RsVisa CONFIG REQUIRED)
 
 
@@ -22,6 +22,8 @@ set(PROJECT_SOURCES
         VisaResourceManager.cpp
         VisaResourceManager.hpp
         visa.hpp
+        # deps/qcustomplot-source/qcustomplot.h
+        # deps/qcustomplot-source/qcustomplot.cpp
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
@@ -47,7 +49,7 @@ else()
     endif()
 endif()
 
-target_link_libraries(ReturnLossAnalyzer PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Concurrent)
+target_link_libraries(ReturnLossAnalyzer PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Concurrent Qt${QT_VERSION_MAJOR}::PrintSupport)
 target_link_libraries(ReturnLossAnalyzer PRIVATE rsvisa::rsvisa)
 
 

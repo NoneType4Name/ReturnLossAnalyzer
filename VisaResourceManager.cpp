@@ -45,7 +45,7 @@ QVector<QString> VisaResourceManager::listResources() const
     ViUInt32 count                = 0;
     ViChar desc[ VI_FIND_BUFLEN ] = { 0 };
 
-    ViStatus st = viFindRsrc( m_rm, "USB?*INSTR", &findList, &count, desc );
+    ViStatus st = viFindRsrc( m_rm, "?*", &findList, &count, desc );
     if ( st < VI_SUCCESS )
     {
         m_lastError = "viFindRsrc failed: " + statusToString( st );

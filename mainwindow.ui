@@ -81,6 +81,12 @@
               <pointsize>14</pointsize>
              </font>
             </property>
+            <property name="maximum">
+             <double>999.990000000000009</double>
+            </property>
+            <property name="value">
+             <double>20.000000000000000</double>
+            </property>
            </widget>
           </item>
           <item>
@@ -140,6 +146,12 @@
              <font>
               <pointsize>14</pointsize>
              </font>
+            </property>
+            <property name="maximum">
+             <double>999.990000000000009</double>
+            </property>
+            <property name="value">
+             <double>100.000000000000000</double>
             </property>
            </widget>
           </item>
@@ -221,19 +233,82 @@
              </font>
             </property>
             <property name="text">
-             <string>tests</string>
+             <string>band width</string>
             </property>
            </widget>
           </item>
           <item>
-           <widget class="QSpinBox" name="TestSpinBox">
+           <widget class="QDoubleSpinBox" name="bandWidthDoubleSpinBox">
             <property name="font">
              <font>
               <pointsize>14</pointsize>
              </font>
             </property>
-            <property name="minimum">
+            <property name="maximum">
+             <double>999.990000000000009</double>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QComboBox" name="bandWidthComboBox">
+            <property name="font">
+             <font>
+              <pointsize>14</pointsize>
+             </font>
+            </property>
+            <property name="cursor">
+             <cursorShape>PointingHandCursor</cursorShape>
+            </property>
+            <property name="currentIndex">
              <number>1</number>
+            </property>
+            <item>
+             <property name="text">
+              <string>Hz</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>kHz</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>MHz</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>GHz</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_7">
+          <item>
+           <widget class="QLabel" name="label_5">
+            <property name="font">
+             <font>
+              <pointsize>14</pointsize>
+             </font>
+            </property>
+            <property name="text">
+             <string>+treshold (db)</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QDoubleSpinBox" name="tresholdDoubleSpinBox">
+            <property name="font">
+             <font>
+              <pointsize>14</pointsize>
+             </font>
+            </property>
+            <property name="maximum">
+             <double>99.000000000000000</double>
             </property>
            </widget>
           </item>
@@ -359,7 +434,7 @@
      </layout>
     </item>
     <item>
-     <widget class="QLabel" name="errorLabel">
+     <widget class="QLabel" name="nameLabel">
       <property name="font">
        <font>
         <pointsize>14</pointsize>

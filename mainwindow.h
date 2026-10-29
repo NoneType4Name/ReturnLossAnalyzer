@@ -27,12 +27,14 @@ class MainWindow : public QMainWindow
     void onReloadPushButtonFinished();
 
     void on_testButton_clicked();
+    void onTestButtonReturn();
 
     void on_lockPushButton_clicked();
 
   private:
     Ui::MainWindow *ui;
     QFutureWatcher<QVector<QString>> reloadWatcher;
-    VisaInstrument *inst;
+    QFutureWatcher<QVector<float>> testReturnWatcher;
+    VisaInstrument *inst { 0 };
 };
 #endif // MAINWINDOW_H
