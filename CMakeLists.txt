@@ -22,8 +22,8 @@ set(PROJECT_SOURCES
         VisaResourceManager.cpp
         VisaResourceManager.hpp
         visa.hpp
-        # deps/qcustomplot-source/qcustomplot.h
-        # deps/qcustomplot-source/qcustomplot.cpp
+        deps/qcustomplot-source/qcustomplot.h
+        deps/qcustomplot-source/qcustomplot.cpp
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)

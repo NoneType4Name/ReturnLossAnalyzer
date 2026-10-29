@@ -160,7 +160,7 @@ class VisaInstrument
         char *hash_ptr = nullptr;
         viGetAttribute( instr_, VI_ATTR_TMO_VALUE, &tmo );
         viSetAttribute( instr_, VI_ATTR_TERMCHAR_EN, VI_FALSE );
-        viSetAttribute( instr_, VI_ATTR_TMO_VALUE, 500 );
+        viSetAttribute( instr_, VI_ATTR_TMO_VALUE, 100 );
 
         while ( !hash_ptr )
         {

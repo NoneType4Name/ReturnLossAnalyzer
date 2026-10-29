@@ -1,13 +1,13 @@
 #include "mainwindow.h"
 #include "./ui_mainwindow.h"
-#include <QTimer>
-#include <QtConcurrent>
 #include <cmath>
+#include <QTimer>
+#include <QComboBox>
 #include <QMessageBox>
-#include <qcombobox.h>
-#include <qmessagebox.h>
-#include <qobject.h>
-#include <qtconcurrentrun.h>
+#include <QSizePolicy>
+#include <QtConcurrentRun>
+#include <qcontainerfwd.h>
+#include <vector>
 #include "Visa.hpp"
 #include "visaResourceManager.hpp"
 
@@ -16,7 +16,20 @@ MainWindow::MainWindow( QWidget *parent ) :
 {
     ui->setupUi( this );
     connect( &reloadWatcher, &QFutureWatcher<QVector<QString>>::finished, this, &MainWindow::onReloadPushButtonFinished );
-    connect( &testReturnWatcher, &QFutureWatcher<QVector<float>>::finished, this, &MainWindow::onTestButtonReturn );
+    connect( &testReturnWatcher, &QFutureWatcher<std::vector<double>>::finished, this, &MainWindow::onTestButtonReturn );
+
+    plot = new QCustomPlot { this };
+    ui->workingLayout->addWidget( plot );
+    plot->setSizePolicy( QSizePolicy { QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Expanding } );
+    plot->addGraph();
+    plot->graph( 0 )->setPen( QPen( Qt::red, 2 ) );
+    plot->graph( 0 )->setBrush( QBrush( QColor( 255, 0, 0, 30 ) ) );
+    plot->graph( 0 )->setScatterStyle( QCPScatterStyle::ssCircle );
+    plot->graph( 0 )->setLineStyle( QCPGraph::lsLine );
+    plot->xAxis->setRange( -1, 1 ); // msec
+    plot->yAxis->setRange( -1, 1 ); // adc amplitude
+    plot->xAxis->setLabel( "frequency" );
+    plot->yAxis->setLabel( "|S11|" );
 }
 
 MainWindow::~MainWindow()
@@ -24,6 +37,7 @@ MainWindow::~MainWindow()
     QThreadPool::globalInstance()->waitForDone();
     delete inst;
     inst = 0;
+    delete plot;
     delete ui;
 }
 
@@ -37,6 +51,7 @@ void MainWindow::on_connectButton_clicked()
         ui->connectButton->setText( "connect" );
         ui->testButton->setEnabled( 0 );
         ui->reloadPushButton->setEnabled( 1 );
+        ui->comPortsComboBox->setEnabled( 1 );
     }
     else
     {
@@ -50,6 +65,7 @@ void MainWindow::on_connectButton_clicked()
         ui->nameLabel->setText( QString::fromStdString( inst->query( "*IDN?\n" ) ) );
         ui->testButton->setEnabled( 1 );
         ui->reloadPushButton->setEnabled( 0 );
+        ui->comPortsComboBox->setEnabled( 0 );
     }
 }
 
@@ -100,6 +116,12 @@ void MainWindow::onTestButtonReturn()
         QString ans { QString( "Подходящих каналов: %1, на частотах: \n%2" ).arg( ret.size() ).arg( bands ) };
         QMessageBox::information( this, "Measure result", ans );
     }
+    for ( size_t i { 0 }; i < ret.size(); i += 2 )
+    {
+        plot->graph( 0 )->addData( ret[ i ], ret[ i + 1 ] );
+    }
+    plot->graph( 0 )->rescaleAxes();
+    plot->replot();
     ui->testButton->setEnabled( 1 );
     ui->startHzDoubleSpinBox->setEnabled( 1 );
     ui->startUnitComboBox->setEnabled( 1 );
@@ -109,7 +131,6 @@ void MainWindow::onTestButtonReturn()
     ui->bandWidthComboBox->setEnabled( 1 );
     ui->bandWidthDoubleSpinBox->setEnabled( 1 );
     ui->connectButton->setEnabled( 1 );
-    ui->comPortsComboBox->setEnabled( 1 );
 }
 
 void MainWindow::on_testButton_clicked()
@@ -123,9 +144,8 @@ void MainWindow::on_testButton_clicked()
     ui->bandWidthComboBox->setEnabled( 0 );
     ui->bandWidthDoubleSpinBox->setEnabled( 0 );
     ui->connectButton->setEnabled( 0 );
-    ui->comPortsComboBox->setEnabled( 0 );
-    QFuture<QVector<float>> future = QtConcurrent::run( [ & ]()
-                                                        {
+    QFuture<std::vector<double>> future = QtConcurrent::run( [ & ]()
+                                                             {
                                                             inst->write("INIT1:CONT OFF");
                                                             inst->write("CALC1:PAR:DEL:ALL");
                                                             inst->write("CALC1:PAR:DEF S11, S11");
@@ -139,10 +159,9 @@ void MainWindow::on_testButton_clicked()
                                                             inst->write("INIT:IMM");
                                                             inst->query("*OPC?");
                                                             inst->write("CALC1:DATA SDAT");
-                                                            auto d{inst->rawDataRead()};//\/
-                                                            // if(d[0] == '#')
-                                                            
-                                                             return QVector<float> { 1000000, 20000000 }; } );
+                                                            auto d{inst->rawDataRead()}; 
+
+                                                             return d; } );
     testReturnWatcher.setFuture( future );
 }
 
