@@ -93,5 +93,7 @@ void VisaResourceManager::closeSession( ViSession &session )
 
 QString VisaResourceManager::lastError() const
 {
-    return m_lastError;
+    auto t { m_lastError };
+    m_lastError.clear();
+    return t;
 }

@@ -1,9 +1,12 @@
 #pragma once
+#include <vector>
 #include <visa.h>
 #include <string>
 #include <stdexcept>
 #include <chrono>
 #include <thread>
+#include <cstring>
+#include <visatype.h>
 
 class VisaError : public std::runtime_error
 {
@@ -43,7 +46,7 @@ class VisaInstrument
   public:
     explicit VisaInstrument( ViSession inst,
                              uint32_t timeout_ms    = 1000,
-                             bool check_after_write = true ) :
+                             bool check_after_write = false ) :
         instr_( inst ), check_after_write_( check_after_write )
     {
         viSetAttribute( instr_, VI_ATTR_TMO_VALUE, timeout_ms );
@@ -148,6 +151,50 @@ class VisaInstrument
         return out;
     }
 
+    std::vector<double> rawDataRead()
+    {
+        uint32_t tmo;
+        char buf[ 9 ];
+        ViUInt32 got   = 0;
+        ViStatus st    = VI_SUCCESS;
+        char *hash_ptr = nullptr;
+        viGetAttribute( instr_, VI_ATTR_TMO_VALUE, &tmo );
+        viSetAttribute( instr_, VI_ATTR_TERMCHAR_EN, VI_FALSE );
+        viSetAttribute( instr_, VI_ATTR_TMO_VALUE, 500 );
+
+        while ( !hash_ptr )
+        {
+            st = viRead( instr_, reinterpret_cast<ViBuf>( buf ), 1, &got );
+            if ( st < 0 ) throw VisaError( st, "viRead", "Read failed on " + addr_ );
+            if ( got == 0 ) throw std::runtime_error( "No data received" );
+            if ( buf[ 0 ] == '#' )
+                hash_ptr = buf;
+        }
+
+        st = viRead( instr_, reinterpret_cast<ViBuf>( buf ), 1, &got );
+        if ( st < 0 ) throw VisaError( st, "viRead", "Read failed on " + addr_ );
+        if ( got == 0 ) throw std::runtime_error( "No data received" );
+        hash_ptr = buf;
+
+        int num_digits = *( hash_ptr ) - '0';
+        if ( num_digits < 1 || num_digits > 9 ) throw std::runtime_error( "Invalid header format" );
+
+        st = viRead( instr_, reinterpret_cast<ViBuf>( buf ), num_digits, &got );
+        if ( st < 0 ) throw VisaError( st, "viRead", "Read failed on " + addr_ );
+        if ( got == 0 ) throw std::runtime_error( "No data received" );
+
+        size_t total_bytes = std::stoul( buf );
+        std::vector<double> out_data( total_bytes / sizeof( double ) );
+
+        st = viRead( instr_, reinterpret_cast<ViBuf>( out_data.data() ), total_bytes, &got );
+        if ( st < 0 && st != VI_ERROR_TMO ) throw VisaError( st, "viRead", "Read failed on " + addr_ );
+        if ( got == 0 ) throw std::runtime_error( "No data received" );
+
+        viSetAttribute( instr_, VI_ATTR_TERMCHAR_EN, VI_TRUE );
+        viSetAttribute( instr_, VI_ATTR_TMO_VALUE, tmo );
+        return out_data;
+    }
+
     ScpiError lastError()
     {
         ScpiError first;
@@ -168,26 +215,26 @@ class VisaInstrument
         query( "*OPC?" );
     }
 
-    bool tryWaitComplete( unsigned poll_ms = 50, unsigned max_ms = 10000 )
-    {
-        auto t0 = std::chrono::steady_clock::now();
-        while ( std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::steady_clock::now() - t0 )
-                    .count() < max_ms )
-        {
-            try
-            {
-                std::string r = query( "*OPC?" );
-                if ( !r.empty() && r[ 0 ] == '1' ) return true;
-            }
-            catch ( ... )
-            {
-            }
-            std::this_thread::sleep_for(
-                std::chrono::milliseconds( poll_ms ) );
-        }
-        return false;
-    }
+    // bool tryWaitComplete( unsigned poll_ms = 50, unsigned max_ms = 10000 )
+    // {
+    //     auto t0 = std::chrono::steady_clock::now();
+    //     while ( std::chrono::duration_cast<std::chrono::milliseconds>(
+    //                 std::chrono::steady_clock::now() - t0 )
+    //                 .count() < max_ms )
+    //     {
+    //         try
+    //         {
+    //             std::string r = query( "*OPC?" );
+    //             if ( !r.empty() && r[ 0 ] == '1' ) return true;
+    //         }
+    //         catch ( ... )
+    //         {
+    //         }
+    //         std::this_thread::sleep_for(
+    //             std::chrono::milliseconds( poll_ms ) );
+    //     }
+    //     return false;
+    // }
 
     ViSession session() const
     {
@@ -205,7 +252,7 @@ class VisaInstrument
         auto comma = s.find( ',' );
         if ( comma == std::string::npos )
         {
-            if ( !s.empty() && s[ 0 ] == '0' ) return e;
+            if ( !s.empty() && ( s[ 0 ] == '0' || s[ 0 ] == '\n' ) ) return e;
             e.code    = -1;
             e.message = s;
             return e;

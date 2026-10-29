@@ -6,6 +6,7 @@
 #include <QMessageBox>
 #include <qcombobox.h>
 #include <qmessagebox.h>
+#include <qobject.h>
 #include <qtconcurrentrun.h>
 #include "Visa.hpp"
 #include "visaResourceManager.hpp"
@@ -39,7 +40,7 @@ void MainWindow::on_connectButton_clicked()
     }
     else
     {
-        auto st = VisaResourceManager::instance().openSession( ui->comPortsComboBox->currentText(), 2000 );
+        auto st = VisaResourceManager::instance().openSession( ui->comPortsComboBox->currentText(), 5000 );
         if ( st == VI_NULL )
         {
             QMessageBox::critical( this, "Error", VisaResourceManager::instance().lastError() );
@@ -75,7 +76,9 @@ void MainWindow::onReloadPushButtonFinished()
     }
     ui->reloadPushButton->setEnabled( 1 );
     ui->connectButton->setEnabled( 1 );
-    QMessageBox::critical( this, "Error", VisaResourceManager::instance().lastError() );
+    auto err { VisaResourceManager::instance().lastError() };
+    if ( err.size() )
+        QMessageBox::critical( this, "Error", err );
 }
 
 void MainWindow::onTestButtonReturn()
@@ -104,7 +107,7 @@ void MainWindow::onTestButtonReturn()
     ui->endUnitComboBox->setEnabled( 1 );
     ui->pointsCountSpinBox->setEnabled( 1 );
     ui->bandWidthComboBox->setEnabled( 1 );
-    ui->bandWidthSpinBox->setEnabled( 1 );
+    ui->bandWidthDoubleSpinBox->setEnabled( 1 );
     ui->connectButton->setEnabled( 1 );
     ui->comPortsComboBox->setEnabled( 1 );
 }
@@ -118,11 +121,28 @@ void MainWindow::on_testButton_clicked()
     ui->endUnitComboBox->setEnabled( 0 );
     ui->pointsCountSpinBox->setEnabled( 0 );
     ui->bandWidthComboBox->setEnabled( 0 );
-    ui->bandWidthSpinBox->setEnabled( 0 );
+    ui->bandWidthDoubleSpinBox->setEnabled( 0 );
     ui->connectButton->setEnabled( 0 );
     ui->comPortsComboBox->setEnabled( 0 );
-    QFuture<QVector<float>> future = QtConcurrent::run( []()
-                                                        { return QVector<float> { 1000000, 20000000 }; } );
+    QFuture<QVector<float>> future = QtConcurrent::run( [ & ]()
+                                                        {
+                                                            inst->write("INIT1:CONT OFF");
+                                                            inst->write("CALC1:PAR:DEL:ALL");
+                                                            inst->write("CALC1:PAR:DEF S11, S11");
+                                                            inst->write("CALC1:FORM MLOG");
+                                                            inst->write("FORM:DATA REAL,64");
+                                                            inst->write("FORM:BORD SWAP");
+                                                            // inst->write("DISP:TRAC1:FEED S11\n");
+                                                            inst->write(QString("FREQ:STAR %1").arg(ui->startHzDoubleSpinBox->value()*std::pow(10,3*ui->startUnitComboBox->currentIndex()),0, 'f',2).toStdString());
+                                                            inst->write(QString("FREQ:STOP %1").arg(ui->endHzDoubleSpinBox->value()*std::pow(10,3*ui->endUnitComboBox->currentIndex()),0, 'f',2).toStdString());
+                                                            inst->write(QString("SWE:POIN %1").arg(ui->pointsCountSpinBox->value()).toStdString());
+                                                            inst->write("INIT:IMM");
+                                                            inst->query("*OPC?");
+                                                            inst->write("CALC1:DATA SDAT");
+                                                            auto d{inst->rawDataRead()};//\/
+                                                            // if(d[0] == '#')
+                                                            
+                                                             return QVector<float> { 1000000, 20000000 }; } );
     testReturnWatcher.setFuture( future );
 }
 
