@@ -1,12 +1,20 @@
 #pragma once
+#include <cstdint>
 #include <vector>
 #include <visa.h>
 #include <string>
 #include <stdexcept>
-#include <chrono>
-#include <thread>
 #include <cstring>
 #include <visatype.h>
+
+#define STR_IMPL( x ) #x
+#define STR( x )      STR_IMPL( x )
+
+// Магия компилятора: __builtin_strrchr находит последний слэш на этапе компиляции,
+// чтобы в исключении оставалось только "visa.hpp:131", а не "C:\Users\...\visa.hpp:131"
+#define AT_LINE_FILENAME ( __builtin_strrchr( __FILE__, '\\' ) ? __builtin_strrchr( __FILE__, '\\' ) + 1 : ( __builtin_strrchr( __FILE__, '/' ) ? __builtin_strrchr( __FILE__, '/' ) + 1 : __FILE__ ) )
+
+#define AT_LINE ( std::string( AT_LINE_FILENAME ) + ":" + STR( __LINE__ ) )
 
 class VisaError : public std::runtime_error
 {
@@ -126,7 +134,7 @@ class VisaInstrument
                                     static_cast<ViUInt32>( s.size() ),
                                     &written );
         if ( st < VI_SUCCESS )
-            throw VisaError( st, "viWrite", "Write failed on " + addr_ );
+            throw VisaError( st, "viWrite", AT_LINE );
         if ( written != s.size() )
             throw VisaError( -1, "viWrite", "Partial write" );
     }
@@ -144,9 +152,9 @@ class VisaInstrument
                                   &got );
             if ( got > 0 ) out.append( buf, got );
 
-            if ( st == VI_SUCCESS_TERM_CHAR ) break;
+            if ( st == VI_SUCCESS_TERM_CHAR || st == VI_SUCCESS ) break;
             else if ( st < 0 )
-                throw VisaError( st, "viRead", "Read failed on " + addr_ );
+                throw VisaError( st, "viRead", AT_LINE );
         }
         return out;
     }
@@ -165,14 +173,14 @@ class VisaInstrument
         while ( !hash_ptr )
         {
             st = viRead( instr_, reinterpret_cast<ViBuf>( buf ), 1, &got );
-            if ( st < 0 ) throw VisaError( st, "viRead", "Read failed on " + addr_ );
+            if ( st < 0 ) throw VisaError( st, "viRead", AT_LINE );
             if ( got == 0 ) throw std::runtime_error( "No data received" );
             if ( buf[ 0 ] == '#' )
                 hash_ptr = buf;
         }
 
         st = viRead( instr_, reinterpret_cast<ViBuf>( buf ), 1, &got );
-        if ( st < 0 ) throw VisaError( st, "viRead", "Read failed on " + addr_ );
+        if ( st < 0 ) throw VisaError( st, "viRead", AT_LINE );
         if ( got == 0 ) throw std::runtime_error( "No data received" );
         hash_ptr = buf;
 
@@ -180,14 +188,14 @@ class VisaInstrument
         if ( num_digits < 1 || num_digits > 9 ) throw std::runtime_error( "Invalid header format" );
 
         st = viRead( instr_, reinterpret_cast<ViBuf>( buf ), num_digits, &got );
-        if ( st < 0 ) throw VisaError( st, "viRead", "Read failed on " + addr_ );
+        if ( st < 0 ) throw VisaError( st, "viRead", AT_LINE );
         if ( got == 0 ) throw std::runtime_error( "No data received" );
 
         size_t total_bytes = std::stoul( buf );
         std::vector<double> out_data( total_bytes / sizeof( double ) );
 
         st = viRead( instr_, reinterpret_cast<ViBuf>( out_data.data() ), total_bytes, &got );
-        if ( st < 0 && st != VI_ERROR_TMO ) throw VisaError( st, "viRead", "Read failed on " + addr_ );
+        if ( st < 0 && st != VI_ERROR_TMO ) throw VisaError( st, "viRead", AT_LINE );
         if ( got == 0 ) throw std::runtime_error( "No data received" );
 
         viSetAttribute( instr_, VI_ATTR_TERMCHAR_EN, VI_TRUE );

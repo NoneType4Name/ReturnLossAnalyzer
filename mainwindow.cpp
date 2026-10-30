@@ -8,7 +8,7 @@
 #include <QtConcurrentRun>
 #include <qcontainerfwd.h>
 #include <vector>
-#include "Visa.hpp"
+#include "visa.hpp"
 #include "visaResourceManager.hpp"
 
 MainWindow::MainWindow( QWidget *parent ) :
@@ -16,7 +16,7 @@ MainWindow::MainWindow( QWidget *parent ) :
 {
     ui->setupUi( this );
     connect( &reloadWatcher, &QFutureWatcher<QVector<QString>>::finished, this, &MainWindow::onReloadPushButtonFinished );
-    connect( &testReturnWatcher, &QFutureWatcher<std::vector<double>>::finished, this, &MainWindow::onTestButtonReturn );
+    connect( &testReturnWatcher, &QFutureWatcher<std::pair<std::vector<uint32_t>, std::vector<double>>>::finished, this, &MainWindow::onTestButtonReturn );
 
     plot = new QCustomPlot { this };
     ui->workingLayout->addWidget( plot );
@@ -24,12 +24,13 @@ MainWindow::MainWindow( QWidget *parent ) :
     plot->addGraph();
     plot->graph( 0 )->setPen( QPen( Qt::red, 2 ) );
     plot->graph( 0 )->setBrush( QBrush( QColor( 255, 0, 0, 30 ) ) );
-    plot->graph( 0 )->setScatterStyle( QCPScatterStyle::ssCircle );
-    plot->graph( 0 )->setLineStyle( QCPGraph::lsLine );
-    plot->xAxis->setRange( -1, 1 ); // msec
-    plot->yAxis->setRange( -1, 1 ); // adc amplitude
+    plot->graph( 0 )->setLineStyle( QCPGraph::lsNone );
+    plot->graph( 0 )->setScatterStyle( QCPScatterStyle( QCPScatterStyle::ssCircle, 6 ) );
+    plot->xAxis->setRange( -1, 1 );
+    plot->yAxis->setRange( -1, 1 );
     plot->xAxis->setLabel( "frequency" );
     plot->yAxis->setLabel( "|S11|" );
+    on_reloadPushButton_clicked();
 }
 
 MainWindow::~MainWindow()
@@ -100,25 +101,27 @@ void MainWindow::onReloadPushButtonFinished()
 void MainWindow::onTestButtonReturn()
 {
     auto ret { testReturnWatcher.future().result() };
-    if ( ret.empty() )
+    if ( ret.first.empty() )
     {
         QMessageBox::information( this, "Measure result", "Не подходит заданным условиям." );
     }
     else
     {
         QString bands;
-        for ( auto band : ret )
-        {
-            bands += QString::number( band / ( std::pow( 10, ui->startUnitComboBox->currentIndex() * 3 ) ) ) + ' ' + ui->startUnitComboBox->currentText() + ", ";
-        }
+        // for ( auto band : ret )
+        // {
+        //     bands += QString::number( band / ( std::pow( 10, ui->startUnitComboBox->currentIndex() * 3 ) ) ) + ' ' + ui->startUnitComboBox->currentText() + ", ";
+        // }
         if ( bands.size() )
             bands.resize( bands.size() - 2 );
-        QString ans { QString( "Подходящих каналов: %1, на частотах: \n%2" ).arg( ret.size() ).arg( bands ) };
+        QString ans { QString( "Подходящих каналов: %1, на частотах: \n%2" ).arg( ret.first.size() ).arg( bands ) };
         QMessageBox::information( this, "Measure result", ans );
     }
-    for ( size_t i { 0 }; i < ret.size(); i += 2 )
+
+    plot->graph( 0 )->data()->clear();
+    for ( size_t i { 0 }; i < ret.first.size(); ++i )
     {
-        plot->graph( 0 )->addData( ret[ i ], ret[ i + 1 ] );
+        plot->graph( 0 )->addData( ret.first[ i ], ret.second[ i ] );
     }
     plot->graph( 0 )->rescaleAxes();
     plot->replot();
@@ -144,24 +147,28 @@ void MainWindow::on_testButton_clicked()
     ui->bandWidthComboBox->setEnabled( 0 );
     ui->bandWidthDoubleSpinBox->setEnabled( 0 );
     ui->connectButton->setEnabled( 0 );
-    QFuture<std::vector<double>> future = QtConcurrent::run( [ & ]()
-                                                             {
+    QFuture<std::pair<std::vector<uint32_t>, std::vector<double>>> future = QtConcurrent::run( [ & ]()
+                                                                                               {
                                                             inst->write("INIT1:CONT OFF");
                                                             inst->write("CALC1:PAR:DEL:ALL");
-                                                            inst->write("CALC1:PAR:DEF S11, S11");
+                                                            inst->write("CALC1:PAR:DEF 'Trc1', S11");
+                                                            inst->write("CALC1:PAR:SEL 'Trc1'");
                                                             inst->write("CALC1:FORM MLOG");
                                                             inst->write("FORM:DATA REAL,64");
-                                                            inst->write("FORM:BORD SWAP");
-                                                            // inst->write("DISP:TRAC1:FEED S11\n");
                                                             inst->write(QString("FREQ:STAR %1").arg(ui->startHzDoubleSpinBox->value()*std::pow(10,3*ui->startUnitComboBox->currentIndex()),0, 'f',2).toStdString());
                                                             inst->write(QString("FREQ:STOP %1").arg(ui->endHzDoubleSpinBox->value()*std::pow(10,3*ui->endUnitComboBox->currentIndex()),0, 'f',2).toStdString());
                                                             inst->write(QString("SWE:POIN %1").arg(ui->pointsCountSpinBox->value()).toStdString());
+                                                            inst->write("SENS1:BAND 10000");
                                                             inst->write("INIT:IMM");
                                                             inst->query("*OPC?");
-                                                            inst->write("CALC1:DATA SDAT");
-                                                            auto d{inst->rawDataRead()}; 
-
-                                                             return d; } );
+                                                            inst->write("CALC1:DATA:STIM?");
+                                                            auto d{inst->rawDataRead()};
+                                                            std::vector<uint32_t> x {d.begin(), d.end()}; 
+                                                            inst->query("*OPC?");
+                                                            inst->write("CALC1:DATA? FDAT");
+                                                            d = inst->rawDataRead();
+                                                            std::vector<double> y {d.begin(), d.end()}; 
+                                                             return std::make_pair( x, y ); } );
     testReturnWatcher.setFuture( future );
 }
 

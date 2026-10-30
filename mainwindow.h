@@ -1,7 +1,7 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
-#include "Visa.hpp"
+#include "visa.hpp"
 #include <QMainWindow>
 #include <QFutureWatcher>
 #include <vector>
@@ -36,7 +36,7 @@ class MainWindow : public QMainWindow
   private:
     Ui::MainWindow *ui;
     QFutureWatcher<QVector<QString>> reloadWatcher;
-    QFutureWatcher<std::vector<double>> testReturnWatcher;
+    QFutureWatcher<std::pair<std::vector<uint32_t>, std::vector<double>>> testReturnWatcher;
     VisaInstrument *inst { 0 };
     QCustomPlot *plot;
 };

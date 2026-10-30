@@ -1,5 +1,6 @@
 #include "visaResourceManager.hpp"
 #include <QDebug>
+#include <visa.h>
 
 VisaResourceManager &VisaResourceManager::instance()
 {
@@ -44,7 +45,8 @@ QVector<QString> VisaResourceManager::listResources() const
     ViFindList findList           = VI_NULL;
     ViUInt32 count                = 0;
     ViChar desc[ VI_FIND_BUFLEN ] = { 0 };
-
+    viSetAttribute( m_rm, VI_RS_ATTR_TCPIP_FIND_RSRC_MODE, VI_RS_FIND_MODE_CONFIG | VI_RS_FIND_MODE_VXI11 );
+    viSetAttribute( m_rm, VI_RS_ATTR_TCPIP_FIND_RSRC_TMO, 500 );
     ViStatus st = viFindRsrc( m_rm, "?*", &findList, &count, desc );
     if ( st < VI_SUCCESS )
     {
