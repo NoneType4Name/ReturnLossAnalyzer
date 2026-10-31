@@ -6,6 +6,7 @@
 #include <QFutureWatcher>
 #include <vector>
 #include <qcustomplot.h>
+#include "BandwidthSearch.hxx"
 
 QT_BEGIN_NAMESPACE
 namespace Ui
@@ -34,9 +35,14 @@ class MainWindow : public QMainWindow
     void on_lockPushButton_clicked();
 
   private:
+    void addBw();
     Ui::MainWindow *ui;
     QFutureWatcher<QVector<QString>> reloadWatcher;
-    QFutureWatcher<std::pair<std::vector<double>, std::vector<double>>> testReturnWatcher;
+    QFutureWatcher<std::pair<std::vector<ChannelBounds>, std::pair<std::vector<double>, std::vector<double>>>> testReturnWatcher;
     VisaInstrument *inst { 0 };
+    std::vector<QCPAbstractItem *> _plotItems;
+    std::vector<ChannelBounds> channels;
+    std::vector<double> freq;
+    std::vector<double> dbMag;
 };
 #endif // MAINWINDOW_H

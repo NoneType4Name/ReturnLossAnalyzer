@@ -8,6 +8,8 @@ set(CMAKE_AUTORCC ON)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(BUILD_TESTS OFF CACHE INTERNAL "")
+set(DOWNLOAD_GTEST OFF CACHE INTERNAL "")
 
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets Concurrent PrintSupport)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Concurrent PrintSupport)
@@ -24,6 +26,10 @@ set(PROJECT_SOURCES
     deps/qcustomplot-source/qcustomplot.h
     deps/qcustomplot-source/qcustomplot.cpp
 )
+
+add_subdirectory(submodules/xtl)
+add_subdirectory(submodules/xtensor)
+
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(ReturnLossAnalyzer
@@ -53,6 +59,7 @@ endif()
 target_include_directories(ReturnLossAnalyzer PRIVATE deps/qcustomplot-source)
 target_link_libraries(ReturnLossAnalyzer PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Concurrent Qt${QT_VERSION_MAJOR}::PrintSupport)
 target_link_libraries(ReturnLossAnalyzer PRIVATE rsvisa::rsvisa)
+target_link_libraries(ReturnLossAnalyzer PRIVATE xtensor)
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
 # If you are developing for iOS or macOS you should consider setting an
