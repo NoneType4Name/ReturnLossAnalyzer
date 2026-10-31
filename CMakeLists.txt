@@ -50,6 +50,7 @@ else()
     endif()
 endif()
 
+target_include_directories(ReturnLossAnalyzer PRIVATE deps/qcustomplot-source)
 target_link_libraries(ReturnLossAnalyzer PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::Concurrent Qt${QT_VERSION_MAJOR}::PrintSupport)
 target_link_libraries(ReturnLossAnalyzer PRIVATE rsvisa::rsvisa)
 

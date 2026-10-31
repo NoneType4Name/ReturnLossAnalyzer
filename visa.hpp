@@ -7,14 +7,10 @@
 #include <cstring>
 #include <visatype.h>
 
-#define STR_IMPL( x ) #x
-#define STR( x )      STR_IMPL( x )
+#define STRINGIFY_DETAIL(x) #x
+#define STRINGIFY(x) STRINGIFY_DETAIL(x)
 
-// Магия компилятора: __builtin_strrchr находит последний слэш на этапе компиляции,
-// чтобы в исключении оставалось только "visa.hpp:131", а не "C:\Users\...\visa.hpp:131"
-#define AT_LINE_FILENAME ( __builtin_strrchr( __FILE__, '\\' ) ? __builtin_strrchr( __FILE__, '\\' ) + 1 : ( __builtin_strrchr( __FILE__, '/' ) ? __builtin_strrchr( __FILE__, '/' ) + 1 : __FILE__ ) )
-
-#define AT_LINE ( std::string( AT_LINE_FILENAME ) + ":" + STR( __LINE__ ) )
+#define AT_LINE (__FILE__ ":" STRINGIFY(__LINE__))
 
 class VisaError : public std::runtime_error
 {
@@ -136,7 +132,7 @@ class VisaInstrument
         if ( st < VI_SUCCESS )
             throw VisaError( st, "viWrite", AT_LINE );
         if ( written != s.size() )
-            throw VisaError( -1, "viWrite", "Partial write" );
+            throw VisaError( -1, "viWrite", AT_LINE );
     }
 
     std::string rawRead()
@@ -150,7 +146,7 @@ class VisaInstrument
                                   reinterpret_cast<ViBuf>( buf ),
                                   sizeof( buf ),
                                   &got );
-            if ( got > 0 ) out.append( buf, got );
+            if ( got > 0 || got ) out.append( buf, got );
 
             if ( st == VI_SUCCESS_TERM_CHAR || st == VI_SUCCESS ) break;
             else if ( st < 0 )
@@ -173,8 +169,7 @@ class VisaInstrument
         while ( !hash_ptr )
         {
             st = viRead( instr_, reinterpret_cast<ViBuf>( buf ), 1, &got );
-            if ( st < 0 ) throw VisaError( st, "viRead", AT_LINE );
-            if ( got == 0 ) throw std::runtime_error( "No data received" );
+            if ( st < 0 && !got ) throw VisaError( st, "viRead", AT_LINE );
             if ( buf[ 0 ] == '#' )
                 hash_ptr = buf;
         }
@@ -192,7 +187,7 @@ class VisaInstrument
         if ( got == 0 ) throw std::runtime_error( "No data received" );
 
         size_t total_bytes = std::stoul( buf );
-        std::vector<double> out_data( total_bytes / sizeof( double ) );
+        std::vector<char> out_data( total_bytes  );
 
         st = viRead( instr_, reinterpret_cast<ViBuf>( out_data.data() ), total_bytes, &got );
         if ( st < 0 && st != VI_ERROR_TMO ) throw VisaError( st, "viRead", AT_LINE );
@@ -200,7 +195,7 @@ class VisaInstrument
 
         viSetAttribute( instr_, VI_ATTR_TERMCHAR_EN, VI_TRUE );
         viSetAttribute( instr_, VI_ATTR_TMO_VALUE, tmo );
-        return out_data;
+        return {};
     }
 
     ScpiError lastError()

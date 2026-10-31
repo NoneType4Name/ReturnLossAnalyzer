@@ -5,7 +5,7 @@
 #include <QMainWindow>
 #include <QFutureWatcher>
 #include <vector>
-#include "deps/qcustomplot-source/qcustomplot.h"
+#include <qcustomplot.h>
 
 QT_BEGIN_NAMESPACE
 namespace Ui
@@ -36,8 +36,7 @@ class MainWindow : public QMainWindow
   private:
     Ui::MainWindow *ui;
     QFutureWatcher<QVector<QString>> reloadWatcher;
-    QFutureWatcher<std::pair<std::vector<uint32_t>, std::vector<double>>> testReturnWatcher;
+    QFutureWatcher<std::pair<std::vector<double>, std::vector<double>>> testReturnWatcher;
     VisaInstrument *inst { 0 };
-    QCustomPlot *plot;
 };
 #endif // MAINWINDOW_H

@@ -16,20 +16,21 @@ MainWindow::MainWindow( QWidget *parent ) :
 {
     ui->setupUi( this );
     connect( &reloadWatcher, &QFutureWatcher<QVector<QString>>::finished, this, &MainWindow::onReloadPushButtonFinished );
-    connect( &testReturnWatcher, &QFutureWatcher<std::pair<std::vector<uint32_t>, std::vector<double>>>::finished, this, &MainWindow::onTestButtonReturn );
+    connect( &testReturnWatcher, &QFutureWatcher<std::pair<std::vector<double>, std::vector<double>>>::finished, this, &MainWindow::onTestButtonReturn );
 
-    plot = new QCustomPlot { this };
-    ui->workingLayout->addWidget( plot );
-    plot->setSizePolicy( QSizePolicy { QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Expanding } );
-    plot->addGraph();
-    plot->graph( 0 )->setPen( QPen( Qt::red, 2 ) );
-    plot->graph( 0 )->setBrush( QBrush( QColor( 255, 0, 0, 30 ) ) );
-    plot->graph( 0 )->setLineStyle( QCPGraph::lsNone );
-    plot->graph( 0 )->setScatterStyle( QCPScatterStyle( QCPScatterStyle::ssCircle, 6 ) );
-    plot->xAxis->setRange( -1, 1 );
-    plot->yAxis->setRange( -1, 1 );
-    plot->xAxis->setLabel( "frequency" );
-    plot->yAxis->setLabel( "|S11|" );
+    // plot = new QCustomPlot { this };
+    // ui->workingLayout->addWidget( plot );
+    // plot->setSizePolicy( QSizePolicy { QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Expanding } );
+    ui->plot->addGraph();
+    ui->plot->addGraph();
+    ui->plot->graph( 0 )->setPen( QPen( Qt::red, 2 ) );
+    ui->plot->graph( 0 )->setBrush( QBrush( QColor( 255, 0, 0, 30 ) ) );
+    ui->plot->graph( 0 )->setLineStyle( QCPGraph::lsLine );
+    ui->plot->graph( 0 )->setScatterStyle( QCPScatterStyle( QCPScatterStyle::ssDot ) );
+    ui->plot->xAxis->setRange( -1, 1 );
+    ui->plot->yAxis->setRange( -1, 1 );
+    ui->plot->xAxis->setLabel( "frequency" );
+    ui->plot->yAxis->setLabel( "|S11|" );
     on_reloadPushButton_clicked();
 }
 
@@ -38,7 +39,6 @@ MainWindow::~MainWindow()
     QThreadPool::globalInstance()->waitForDone();
     delete inst;
     inst = 0;
-    delete plot;
     delete ui;
 }
 
@@ -115,16 +115,16 @@ void MainWindow::onTestButtonReturn()
         if ( bands.size() )
             bands.resize( bands.size() - 2 );
         QString ans { QString( "Подходящих каналов: %1, на частотах: \n%2" ).arg( ret.first.size() ).arg( bands ) };
-        QMessageBox::information( this, "Measure result", ans );
+        // QMessageBox::information( this, "Measure result", ans );
     }
 
-    plot->graph( 0 )->data()->clear();
+    ui->plot->graph( 0 )->data()->clear();
     for ( size_t i { 0 }; i < ret.first.size(); ++i )
     {
-        plot->graph( 0 )->addData( ret.first[ i ], ret.second[ i ] );
+        ui->plot->graph( 0 )->addData( ret.first[ i ], ret.second[ i ] );
     }
-    plot->graph( 0 )->rescaleAxes();
-    plot->replot();
+    ui->plot->graph( 0 )->rescaleAxes();
+    ui->plot->replot();
     ui->testButton->setEnabled( 1 );
     ui->startHzDoubleSpinBox->setEnabled( 1 );
     ui->startUnitComboBox->setEnabled( 1 );
@@ -134,6 +134,29 @@ void MainWindow::onTestButtonReturn()
     ui->bandWidthComboBox->setEnabled( 1 );
     ui->bandWidthDoubleSpinBox->setEnabled( 1 );
     ui->connectButton->setEnabled( 1 );
+}
+
+__asm__(
+    ".section .rdata,\"dr\"\n"
+    ".global _binary_freq_bin_start\n"
+    ".global _binary_freq_bin_end\n"
+    ".global _binary_mag_db_bin_start\n"
+    ".global _binary_mag_db_bin_end\n"
+
+    "_binary_freq_bin_start:\n"
+    "   .incbin \"D:/main/coding/u/vna/dataset/freq.bin\"\n"
+    "_binary_freq_bin_end:\n"
+
+    "_binary_mag_db_bin_start:\n"
+    "   .incbin \"D:/main/coding/u/vna/dataset/mag_db.bin\"\n"
+    "_binary_mag_db_bin_end:\n" );
+
+extern "C"
+{
+    extern const double _binary_freq_bin_start[];
+    extern const double _binary_freq_bin_end[];
+    extern const double _binary_mag_db_bin_start[];
+    extern const double _binary_mag_db_bin_end[];
 }
 
 void MainWindow::on_testButton_clicked()
@@ -147,8 +170,8 @@ void MainWindow::on_testButton_clicked()
     ui->bandWidthComboBox->setEnabled( 0 );
     ui->bandWidthDoubleSpinBox->setEnabled( 0 );
     ui->connectButton->setEnabled( 0 );
-    QFuture<std::pair<std::vector<uint32_t>, std::vector<double>>> future = QtConcurrent::run( [ & ]()
-                                                                                               {
+    QFuture<std::pair<std::vector<double>, std::vector<double>>> future = QtConcurrent::run( [ & ]()
+                                                                                             {
                                                             inst->write("INIT1:CONT OFF");
                                                             inst->write("CALC1:PAR:DEL:ALL");
                                                             inst->write("CALC1:PAR:DEF 'Trc1', S11");
@@ -162,12 +185,18 @@ void MainWindow::on_testButton_clicked()
                                                             inst->write("INIT:IMM");
                                                             inst->query("*OPC?");
                                                             inst->write("CALC1:DATA:STIM?");
-                                                            auto d{inst->rawDataRead()};
-                                                            std::vector<uint32_t> x {d.begin(), d.end()}; 
+
+                                                            // auto d{inst->rawDataRead()};
+                                                            inst->rawRead();
+                                                            // std::vector<uint32_t> x {d.begin(), d.end()}; 
+                                                            std::vector<double> x {_binary_freq_bin_start, _binary_freq_bin_end}; 
                                                             inst->query("*OPC?");
                                                             inst->write("CALC1:DATA? FDAT");
-                                                            d = inst->rawDataRead();
-                                                            std::vector<double> y {d.begin(), d.end()}; 
+                                                            
+                                                            inst->rawRead();
+                                                            // d = inst->rawDataRead();
+                                                            // std::vector<double> y {d.begin(), d.end()}; 
+                                                            std::vector<double> y {_binary_mag_db_bin_start, _binary_mag_db_bin_end}; 
                                                              return std::make_pair( x, y ); } );
     testReturnWatcher.setFuture( future );
 }
