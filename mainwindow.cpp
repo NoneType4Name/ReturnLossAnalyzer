@@ -7,6 +7,7 @@
 #include <QSizePolicy>
 #include <QtConcurrentRun>
 #include <qcontainerfwd.h>
+#include <qnamespace.h>
 #include <utility>
 #include <vector>
 #include "deps/qcustomplot-source/qcustomplot.h"
@@ -26,10 +27,18 @@ MainWindow::MainWindow( QWidget *parent ) :
     ui->plot->graph( 0 )->setBrush( QBrush( QColor( 255, 0, 0, 30 ) ) );
     ui->plot->graph( 0 )->setLineStyle( QCPGraph::lsLine );
     ui->plot->graph( 0 )->setScatterStyle( QCPScatterStyle( QCPScatterStyle::ssDot ) );
+    ui->plot->graph( 1 )->setPen( QPen( Qt::blue, 2 ) );
+    ui->plot->graph( 1 )->setLineStyle( QCPGraph::lsNone );
+    ui->plot->graph( 1 )->setScatterStyle( QCPScatterStyle( QCPScatterStyle::ssCircle, 6 ) );
     ui->plot->xAxis->setRange( -1, 1 );
     ui->plot->yAxis->setRange( -1, 1 );
-    ui->plot->xAxis->setLabel( "frequency" );
-    ui->plot->yAxis->setLabel( "|S11|" );
+    ui->plot->xAxis->setLabel( "frequency, Hz" );
+    ui->plot->yAxis->setLabel( "S11, dB" );
+    ui->plot->setInteractions( QCP::iRangeDrag | QCP::iRangeZoom );
+
+    ui->markersTableWidget->horizontalHeader()->setSectionResizeMode( QHeaderView::Stretch );
+    ui->markersTableWidget->viewport()->setMouseTracking( 1 );
+
     on_reloadPushButton_clicked();
 }
 
@@ -106,18 +115,23 @@ void MainWindow::onTestButtonReturn()
 
     if ( channels.empty() )
     {
-        QMessageBox::information( this, "Measure result", "Не подходит заданным условиям." );
+        QMessageBox::information( this, "Measure result", "No channels with this configurations" );
     }
     else
     {
     }
 
     ui->plot->graph( 0 )->data()->clear();
+    ui->plot->graph( 1 )->data()->clear();
     for ( size_t i { 0 }; i < freq.size(); ++i )
     {
         ui->plot->graph( 0 )->addData( freq[ i ], dbMag[ i ] );
     }
-    ui->plot->graph( 0 )->rescaleAxes();
+    for ( size_t i { 0 }; i < channels.size(); ++i )
+    {
+        ui->plot->graph( 1 )->addData( freq[ channels[ i ].peak_idx ], dbMag[ channels[ i ].peak_idx ] );
+    }
+    ui->plot->rescaleAxes();
     this->addBw();
     ui->plot->replot();
     ui->testButton->setEnabled( 1 );
@@ -126,8 +140,8 @@ void MainWindow::onTestButtonReturn()
     ui->endHzDoubleSpinBox->setEnabled( 1 );
     ui->endUnitComboBox->setEnabled( 1 );
     ui->pointsCountSpinBox->setEnabled( 1 );
-    ui->dbandWidthComboBox->setEnabled( 1 );
-    ui->dbandWidthDoubleSpinBox->setEnabled( 1 );
+    ui->bandWidthComboBox->setEnabled( 1 );
+    ui->bandWidthDoubleSpinBox->setEnabled( 1 );
     ui->connectButton->setEnabled( 1 );
 }
 
@@ -154,6 +168,13 @@ extern "C"
     extern const double _binary_mag_db_bin_end[];
 }
 
+inline auto addEnding( double hz )
+{
+    return ( hz >= 1e9 ) ? QString( "%1 GHz" ).arg( hz / 1e9, 0, 'f', 2 ) : ( hz >= 1e6 ) ? QString( "%1 MHz" ).arg( hz / 1e6, 0, 'f', 2 )
+                                                                        : ( hz >= 1e3 )   ? QString( "%1 kHz" ).arg( hz / 1e3, 0, 'f', 2 )
+                                                                                          : QString( "%1 Hz" ).arg( hz, 0, 'f', 2 );
+}
+
 void MainWindow::on_testButton_clicked()
 {
     ui->testButton->setEnabled( 0 );
@@ -162,8 +183,8 @@ void MainWindow::on_testButton_clicked()
     ui->endHzDoubleSpinBox->setEnabled( 0 );
     ui->endUnitComboBox->setEnabled( 0 );
     ui->pointsCountSpinBox->setEnabled( 0 );
-    ui->dbandWidthComboBox->setEnabled( 0 );
-    ui->dbandWidthDoubleSpinBox->setEnabled( 0 );
+    ui->bandWidthComboBox->setEnabled( 0 );
+    ui->bandWidthDoubleSpinBox->setEnabled( 0 );
     ui->connectButton->setEnabled( 0 );
     QFuture<std::pair<std::vector<ChannelBounds>, std::pair<std::vector<double>, std::vector<double>>>> future = QtConcurrent::run( [ & ]()
                                                                                                                                     {
@@ -198,20 +219,21 @@ void MainWindow::on_testButton_clicked()
                                                             auto dbMag {xt::xarray<double>::from_shape({y.size()})};
                                                             std::copy(y.begin(), y.end(), dbMag.begin());
                                                             
-                                                            auto peaks{find_minimum_peaks(dbMag, ui->dlimitDoubleSpinBox->value())};
+                                                            auto peaks{find_minimum_peaks(dbMag, ui->limitDoubleSpinBox->value())};
                                                             auto channels{find_channel_bounds(freq,dbMag,peaks, ui->tresholdDoubleSpinBox->value())};
-                                                            channels = filter_channels_by_bandwidth(freq, channels, ui->dbandWidthDoubleSpinBox->value() * std::pow(10,3*ui-dbandWidthComboBoxx->currentIndex()));
+                                                            channels = filter_channels_by_bandwidth(freq, channels, ui->bandWidthDoubleSpinBox->value() * std::pow(10,3*ui->bandWidthComboBox->currentIndex()));
                                        return std::make_pair( channels, std::make_pair(x, y) ); } );
     testReturnWatcher.setFuture( future );
 }
 
-void MainWindow::on_lockPushButton_clicked()
-{
-    // todo
-}
-
 void MainWindow::addBw()
 {
+    auto rowCount { ui->markersTableWidget->rowCount() };
+    for ( auto i { 0 }; i < rowCount; ++i )
+    {
+        ui->markersTableWidget->removeRow( 0 );
+    }
+
     for ( auto item : _plotItems )
     {
         ui->plot->removeItem( item );
@@ -222,6 +244,7 @@ void MainWindow::addBw()
     dashPen.setWidth( 1 );
     dashPen.setStyle( Qt::DashLine );
     _plotItems.reserve( channels.size() * 3 );
+    size_t i { 0 };
     for ( auto bound : channels )
     {
         QCPItemStraightLine *vLine = static_cast<QCPItemStraightLine *>( _plotItems.emplace_back( new QCPItemStraightLine( ui->plot ) ) );
@@ -238,8 +261,8 @@ void MainWindow::addBw()
         QCPItemStraightLine *vLine3 = static_cast<QCPItemStraightLine *>( _plotItems.emplace_back( new QCPItemStraightLine( ui->plot ) ) );
         vLine3->setPen( dashPen );
 
-        vLine3->point1->setCoords( 0, ui->dlimitDoubleSpinBox->value() );
-        vLine3->point2->setCoords( 1, ui->dlimitDoubleSpinBox->value() );
+        vLine3->point1->setCoords( 0, ui->limitDoubleSpinBox->value() );
+        vLine3->point2->setCoords( 1, ui->limitDoubleSpinBox->value() );
 
         QColor shadingColor( 0, 255, 0, 30 );
         QCPItemRect *rect = static_cast<QCPItemRect *>( _plotItems.emplace_back( new QCPItemRect( ui->plot ) ) );
@@ -256,5 +279,52 @@ void MainWindow::addBw()
 
         rect->topLeft->setCoords( freq[ bound.min_idx ], 0 );
         rect->bottomRight->setCoords( freq[ bound.max_idx ], 1 );
+
+        QCPItemText *marker = static_cast<QCPItemText *>( _plotItems.emplace_back( new QCPItemText( ui->plot ) ) );
+        marker->setPositionAlignment( Qt::AlignBottom | Qt::AlignHCenter );
+        marker->position->setType( QCPItemPosition::ptPlotCoords );
+        marker->position->setCoords( freq[ bound.peak_idx ], dbMag[ bound.peak_idx ] );
+        marker->setText( QString( "M%1" ).arg( ++i ) );
+        marker->setFont( QFont( marker->font().family(), 14 ) );
+
+        ui->markersTableWidget->insertRow( ui->markersTableWidget->rowCount() );
+        auto item = new QTableWidgetItem( QString( "M%1" ).arg( i ) );
+        ui->markersTableWidget->setItem( ui->markersTableWidget->rowCount() - 1, 0, item );
+
+        item = new QTableWidgetItem( addEnding( freq[ bound.peak_idx ] ) );
+        item->setToolTip( QString::number( freq[ bound.peak_idx ], 'f', 0 ) + " Hz" );
+        ui->markersTableWidget->setItem( ui->markersTableWidget->rowCount() - 1, 1, item );
+
+        item = new QTableWidgetItem( QString::number( dbMag[ bound.peak_idx ] ) );
+        ui->markersTableWidget->setItem( ui->markersTableWidget->rowCount() - 1, 2, item );
+
+        item = new QTableWidgetItem( addEnding( freq[ bound.min_idx ] ) );
+        item->setToolTip( QString::number( freq[ bound.min_idx ], 'f', 0 ) + " Hz" );
+        ui->markersTableWidget->setItem( ui->markersTableWidget->rowCount() - 1, 3, item );
+
+        item = new QTableWidgetItem( addEnding( freq[ bound.max_idx ] ) );
+        item->setToolTip( QString::number( freq[ bound.max_idx ], 'f', 0 ) + " Hz" );
+        ui->markersTableWidget->setItem( ui->markersTableWidget->rowCount() - 1, 4, item );
+
+        item = new QTableWidgetItem( addEnding( freq[ bound.peak_idx ] ) );
+        item->setToolTip( QString::number( freq[ bound.peak_idx ], 'f', 0 ) + " Hz" );
+        ui->markersTableWidget->setItem( ui->markersTableWidget->rowCount() - 1, 5, item );
+
+        if ( freq[ bound.max_idx ] == freq[ bound.min_idx ] )
+        {
+            ui->markersTableWidget->setItem( ui->markersTableWidget->rowCount() - 1, 6, new QTableWidgetItem( QString::number( dbMag[ bound.min_idx ] ) ) );
+        }
+        else
+        {
+            double y1 = dbMag[ bound.min_idx ];
+            double y2 = dbMag[ bound.max_idx ];
+            double x1 = freq[ bound.min_idx ];
+            double x2 = freq[ bound.max_idx ];
+            ui->markersTableWidget->setItem( ui->markersTableWidget->rowCount() - 1, 6, new QTableWidgetItem( QString::number( y1 + ( y2 - y1 ) * ( x2 - x1 ) / ( x2 - x1 ) ) ) );
+        }
+
+        item = new QTableWidgetItem( addEnding( ( freq[ bound.max_idx ] - freq[ bound.min_idx ] ) ) );
+        item->setToolTip( QString::number( ( freq[ bound.max_idx ] - freq[ bound.min_idx ] ), 'f', 0 ) + " Hz" );
+        ui->markersTableWidget->setItem( ui->markersTableWidget->rowCount() - 1, 7, item );
     }
 }

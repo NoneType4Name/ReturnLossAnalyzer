@@ -25,10 +25,18 @@ struct ChannelBounds
     size_t max_idx;
 };
 
-inline auto find_channel_bounds( const xt::xarray<double> &freq,
-                                 const xt::xarray<double> &dbmag,
-                                 const xt::xarray<size_t> &peak_indices,
-                                 double treshold )
+struct ChannelConfig
+{
+    double begin;
+    double end;
+    double maxDbMag;
+};
+
+inline auto
+    find_channel_bounds( const xt::xarray<double> &freq,
+                         const xt::xarray<double> &dbmag,
+                         const xt::xarray<size_t> &peak_indices,
+                         double treshold )
 {
     std::vector<ChannelBounds> results;
     results.reserve( peak_indices.size() );

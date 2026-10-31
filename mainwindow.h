@@ -32,8 +32,6 @@ class MainWindow : public QMainWindow
     void on_testButton_clicked();
     void onTestButtonReturn();
 
-    void on_lockPushButton_clicked();
-
   private:
     void addBw();
     Ui::MainWindow *ui;
